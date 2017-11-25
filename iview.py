@@ -124,7 +124,7 @@ class PixbufView(Gtk.ScrolledWindow, actions.CAGandUIManager):
         """
     AC_SELN_MADE, AC_SELN_MASK = actions.ActionCondns.new_flags_and_mask(1)
     AC_PIXBUF_SET, AC_PICBUF_MASK = actions.ActionCondns.new_flags_and_mask(1)
-    ZOOM_FACTOR = fractions.Fraction(11, 10)
+    ZOOM_FACTOR = fractions.Fraction(1005, 1000)
     ZOOM_IN_ADJ = (ZOOM_FACTOR - 1) / 2
     ZOOM_OUT_ADJ = (1 / ZOOM_FACTOR - 1) / 2
     def __init__(self):
@@ -147,13 +147,13 @@ class PixbufView(Gtk.ScrolledWindow, actions.CAGandUIManager):
         self.__seln = XYSelection(self.__da)
         self.__seln.connect("status-changed", self._seln_status_change_cb)
         self.__seln.connect("motion_notify", self._seln_motion_cb)
-        self.__press_cb_id = self.__da.connect("button_press_event", self._da_button_press_cb)
+        self.__press_cb_id = self.connect("button_press_event", self._da_button_press_cb)
         self.__cb_ids = []
-        self.__cb_ids.append(self.__da.connect("button_release_event", self._da_button_release_cb))
-        self.__cb_ids.append(self.__da.connect("motion_notify_event", self._da_motion_notify_cb))
-        self.__cb_ids.append(self.__da.connect("leave_notify_event", self._da_leave_notify_cb))
+        self.__cb_ids.append(self.connect("button_release_event", self._da_button_release_cb))
+        self.__cb_ids.append(self.connect("motion_notify_event", self._da_motion_notify_cb))
+        self.__cb_ids.append(self.connect("leave_notify_event", self._da_leave_notify_cb))
         for cb_id in self.__cb_ids:
-            self.__da.handler_block(cb_id)
+            self.handler_block(cb_id)
     def populate_action_groups(self):
         self.action_groups[self.AC_SELN_MADE].add_actions(
             [
@@ -336,12 +336,14 @@ class PixbufView(Gtk.ScrolledWindow, actions.CAGandUIManager):
             elif event.direction == Gdk.ScrollDirection.UP:
                 self.zoom_out()
                 return True
-        elif event.get_state() & Gdk.ModifierType.SHIFT_MASK:
-            if event.direction == Gdk.ScrollDirection.UP:
-                self.emit("scroll-child", Gtk.SCROLL_STEP_FORWARD, True)
-            elif event.direction == Gdk.ScrollDirection.DOWN:
-                self.emit("scroll-child", Gtk.SCROLL_STEP_BACKWARD, True)
-            return True
+            elif event.direction == Gdk.ScrollDirection.SMOOTH:
+                (_smooth, _delta_x, delta_y) = event.get_scroll_deltas()
+                if delta_y > 0.0:
+                    self.zoom_in()
+                    return True
+                elif delta_y < 0.0:
+                    self.zoom_out()
+                    return True
     # Careful not to override CAGandUIManager method
     def _da_button_press_cb(self, widget, event):
         if event.button == 1 and event.get_state() & Gdk.ModifierType.CONTROL_MASK:
@@ -356,7 +358,7 @@ class PixbufView(Gtk.ScrolledWindow, actions.CAGandUIManager):
         self.__last_xy = this_xy
         for dim, adj in enumerate([self.get_hadjustment(), self.get_vadjustment()]):
             new_val = adj.get_value() - delta_xy[dim]
-            adj.set_value(min(max(new_val, 0), adj.upper - adj.page_size))
+            adj.set_value(min(max(new_val, adj.get_lower()), adj.get_upper() -adj.get_page_size()))
         widget.queue_draw()
         return True
     def _da_button_release_cb(self, widget, event):
